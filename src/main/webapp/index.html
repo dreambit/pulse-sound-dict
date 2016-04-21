@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html ng-app>
+<head>
+<script src="https://code.jquery.com/jquery-2.2.3.min.js"
+    integrity="sha256-a23g1Nt4dtEYOj7bR+vTu7+T8VP13humZFBJNIYoEJo="
+    crossorigin="anonymous"></script>
+<script
+    src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.1.5/angular.min.js"></script>
+<link
+    href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css"
+    rel="stylesheet" type="text/css" />
+<script
+    src="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+<meta charset=utf-8 />
+<title>Angular JS Demo</title>
+</head>
+<body ng-controller="ctrl">
+
+    <style>
+body {
+	padding: 20px;
+}
+
+.search {
+	margin-left: 10px;
+}
+</style>
+
+    <script>
+                    function ctrl($scope) {
+                        $scope.users = [];
+                        $scope.socket = new WebSocket(
+                                "ws://localhost:8080/pulse-rtc/users");
+                        $scope.socket.onmessage = function(message) {
+                            
+                            message = JSON.parse(message.data);
+                            
+                            if (message.messageId == "USER_LEFT") {
+                                console.log("User left - " + message.userName);
+                            } else {
+                                $scope.users = message.users;
+                                $scope.$apply();
+                            }
+                        }
+
+                        setTimeout(function() {
+                            $scope.socket.send(JSON.stringify({
+                                messageId : "USER_LOGIN",
+                                userName : "Rezvan"
+                            }));
+                        }, 3000);
+
+                        
+
+                    }
+                </script>
+
+
+    <div class="form-group">
+        <label for="usr">Name:</label> <input type="text"
+            class="form-control" id="usr">
+    </div>
+    <div class="form-group">
+        <label for="pwd">Password:</label> <input type="password"
+            class="form-control" id="pwd">
+    </div>
+    <div class="form-group">
+        <button type="button" class="btn btn-default">Default</button>
+    </div>
+    <br />
+    <br />
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Firstname</th>
+                <th>Lastname</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr ng-repeat="user in users">
+                <td>{{user.userName}}</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+        </tbody>
+    </table>
+
+
+
+
+</body>
+</html>
