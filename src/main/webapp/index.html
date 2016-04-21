@@ -27,14 +27,17 @@ body {
 </style>
 
     <script>
+                    $(document).ready(function() {
+                        $('#myModal').modal();
+                    });
                     function ctrl($scope) {
                         $scope.users = [];
                         $scope.socket = new WebSocket(
                                 "ws://localhost:8080/pulse-rtc/users");
                         $scope.socket.onmessage = function(message) {
-                            
+
                             message = JSON.parse(message.data);
-                            
+
                             if (message.messageId == "USER_LEFT") {
                                 console.log("User left - " + message.userName);
                             } else {
@@ -42,31 +45,54 @@ body {
                                 $scope.$apply();
                             }
                         }
-
-                        setTimeout(function() {
+                        
+                        $scope.login = function() {
                             $scope.socket.send(JSON.stringify({
                                 messageId : "USER_LOGIN",
-                                userName : "Rezvan"
+                                userName : $scope.userName
                             }));
-                        }, 3000);
-
-                        
-
+                            $('#myModal').modal('toggle');
+                        }
                     }
                 </script>
 
 
-    <div class="form-group">
-        <label for="usr">Name:</label> <input type="text"
-            class="form-control" id="usr">
+    <!-- Modal -->
+    <div class="modal fade" id="myModal" role="dialog">
+        <div class="modal-dialog">
+
+            <!-- Modal content-->
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close"
+                        data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">Modal Header</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="usr">Name:</label> <input
+                            type="text" ng-model="userName" class="form-control" id="usr">
+                    </div>
+                    <div class="form-group">
+                        <label for="pwd">Password:</label> <input
+                            type="password" class="form-control"
+                            id="pwd">
+                    </div>
+                    <div class="form-group">
+                        <button type="button" ng-click="login()" class="btn btn-default">Enter</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default"
+                        data-dismiss="modal">Close</button>
+                </div>
+            </div>
+
+        </div>
     </div>
-    <div class="form-group">
-        <label for="pwd">Password:</label> <input type="password"
-            class="form-control" id="pwd">
+
     </div>
-    <div class="form-group">
-        <button type="button" class="btn btn-default">Default</button>
-    </div>
+
     <br />
     <br />
     <table class="table">
