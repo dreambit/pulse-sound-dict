@@ -1,16 +1,12 @@
 package com.dreambitc.rtc;
 
 import javax.websocket.DecodeException;
-
-import com.dreambitc.rtc.decoders.UserLoginDecoder;
-import com.dreambitc.rtc.dto.UserLogin;
+import javax.websocket.EncodeException;
 
 public class Main {
 
-    public static void main(String[] args) throws DecodeException {
-        UserLoginDecoder d = new UserLoginDecoder();
-        UserLogin l = d.decode("{\"messageId\":\"USER_LOGIN\",\"userName\":\"Rezvan\"}");
-        System.out.println(l.getUserName());
+    public static void main(String[] args) throws DecodeException, EncodeException {
+ 
     }
 
 }

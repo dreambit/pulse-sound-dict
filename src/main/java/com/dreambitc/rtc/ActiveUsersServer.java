@@ -1,11 +1,9 @@
 package com.dreambitc.rtc;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.stream.Collectors;
 
-import javax.json.Json;
-import javax.json.JsonArrayBuilder;
-import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
 import javax.websocket.OnClose;
 import javax.websocket.OnError;
 import javax.websocket.OnMessage;
@@ -13,21 +11,26 @@ import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
 
-import com.dreambitc.rtc.decoders.UserLoginDecoder;
+import com.dreambitc.rtc.decoders.JSONDecoder;
+import com.dreambitc.rtc.dto.ActiveUsersList;
+import com.dreambitc.rtc.dto.IncomingCall;
+import com.dreambitc.rtc.dto.Message;
+import com.dreambitc.rtc.dto.SendMessage;
+import com.dreambitc.rtc.dto.User;
 import com.dreambitc.rtc.dto.UserLogin;
+import com.dreambitc.rtc.dto.UserLogout;
+import com.dreambitc.rtc.encoders.BasicEncoder;
 
-@ServerEndpoint(value = "/users", decoders = { UserLoginDecoder.class })
+@ServerEndpoint(value = "/users", decoders = { JSONDecoder.class }, encoders = { BasicEncoder.class })
 public class ActiveUsersServer {
-
-    private static final String OUT_MESSAGE_USER_LEFT = "{ \"messageId\": \"USER_LEFT\", \"userName\": \"%s\" }";
 
     @OnOpen
     public void open(Session session) throws IOException {
     }
 
     @OnClose
-    public void close(Session session) throws IOException {
-        notifyAll(session, String.format(OUT_MESSAGE_USER_LEFT, session.getUserProperties().get("userName")));
+    public void close(Session session) throws Exception {
+        notifyAll(session, new UserLogout((String) session.getUserProperties().get("userName")));
     }
 
     @OnError
@@ -36,30 +39,62 @@ public class ActiveUsersServer {
     }
 
     @OnMessage
-    public void handleMessage(UserLogin message, Session session) throws IOException {
+    public void handleMessage(Message message, Session session) throws Exception {
+
+        if (message instanceof UserLogin) {
+            handleUserLoginMessage((UserLogin) message, session);
+        } else if (message instanceof SendMessage) {
+            handleSendMessageMessage((SendMessage) message, session);
+        } else if (message instanceof IncomingCall) {
+            handleIncomingCallMessage((IncomingCall) message, session);
+        }
+
+    }
+
+    private void handleUserLoginMessage(UserLogin message, Session session) throws Exception {
         session.getUserProperties().put("userName", message.getUserName());
+        notifyAll(session, message);
+        sendUsersList(session);
+
     }
 
-    private void hanldeGetUsersMessage(Session session) throws IOException {
-        JsonArrayBuilder users = Json.createArrayBuilder();
-        JsonObjectBuilder message = Json.createObjectBuilder();
-
-        message.add("messageId", "USERS_LIST");
-
-        for (Session s : session.getOpenSessions()) {
-            users.add(Json.createObjectBuilder().add("userName", (String) s.getUserProperties().get("userName")));
-        }
-        message.add("users", users);
-        String json = message.build().toString();
-
-        System.out.println(json);
-
-        session.getBasicRemote().sendText(json);
+    private void handleSendMessageMessage(SendMessage message, Session session) {
+        session.getOpenSessions().stream().filter((Session s) -> {
+            return s.getUserProperties().get("userName").equals(message.getTo().getUserName());
+        }).findFirst().ifPresent((Session s) -> {
+            try {
+                s.getBasicRemote().sendObject(message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
 
-    private void notifyAll(Session session, String message) throws IOException {
+    private void handleIncomingCallMessage(IncomingCall message, Session session) {
+        session.getOpenSessions().stream().filter((Session s) -> {
+            return s.getUserProperties().get("userName").equals(message.getTo().getUserName());
+        }).findFirst().ifPresent((Session s) -> {
+            try {
+                s.getBasicRemote().sendObject(message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+
+    private void notifyAll(Session session, Object message) throws Exception {
         for (Session userSession : session.getOpenSessions()) {
-            userSession.getBasicRemote().sendText(message);
+            userSession.getBasicRemote().sendObject(message);
         }
+    }
+
+    private void sendUsersList(Session session) throws Exception {
+
+        Collection<User> users = session.getOpenSessions().stream().map((Session s) -> {
+            return new User((String) s.getUserProperties().get("userName"));
+        }).collect(Collectors.toList());
+
+        session.getBasicRemote().sendObject(new ActiveUsersList(users));
     }
 }
