@@ -13,6 +13,8 @@ import javax.websocket.server.ServerEndpoint;
 
 import com.dreambitc.rtc.decoders.JSONDecoder;
 import com.dreambitc.rtc.dto.ActiveUsersList;
+import com.dreambitc.rtc.dto.CallAnswer;
+import com.dreambitc.rtc.dto.OnIceCandidate;
 import com.dreambitc.rtc.dto.IncomingCall;
 import com.dreambitc.rtc.dto.Message;
 import com.dreambitc.rtc.dto.SendMessage;
@@ -47,6 +49,10 @@ public class ActiveUsersServer {
             handleSendMessageMessage((SendMessage) message, session);
         } else if (message instanceof IncomingCall) {
             handleIncomingCallMessage((IncomingCall) message, session);
+        } else if (message instanceof CallAnswer) {
+            handleAnswerCallMessage((CallAnswer) message, session);
+        } else if (message instanceof OnIceCandidate) {
+            handleIceCandidateMessage((OnIceCandidate) message, session);
         }
 
     }
@@ -82,6 +88,29 @@ public class ActiveUsersServer {
         });
     }
 
+    private void handleIceCandidateMessage(OnIceCandidate message, Session session) {
+        session.getOpenSessions().stream().filter((Session s) -> {
+            return s.getUserProperties().get("userName").equals(message.getTo().getUserName());
+        }).findFirst().ifPresent((Session s) -> {
+            try {
+                s.getBasicRemote().sendObject(message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private void handleAnswerCallMessage(CallAnswer message, Session session) {
+        session.getOpenSessions().stream().filter((Session s) -> {
+            return s.getUserProperties().get("userName").equals(message.getCaller().getUserName());
+        }).findFirst().ifPresent((Session s) -> {
+            try {
+                s.getBasicRemote().sendObject(message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
 
     private void notifyAll(Session session, Object message) throws Exception {
         for (Session userSession : session.getOpenSessions()) {

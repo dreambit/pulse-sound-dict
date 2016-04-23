@@ -6,6 +6,7 @@ public class IncomingCall extends Message {
 
     private User from;
     private User to;
+    private RTCSessionDescription desc;
 
     public IncomingCall(User from, User to) {
         super(MessageConstants.IN_OUT_MESSAGE_ID_INCOMING_CALL);
@@ -27,6 +28,14 @@ public class IncomingCall extends Message {
 
     public void setTo(User to) {
         this.to = to;
+    }
+
+    public RTCSessionDescription getDesc() {
+        return desc;
+    }
+
+    public void setDesc(RTCSessionDescription desc) {
+        this.desc = desc;
     }
 
 }
