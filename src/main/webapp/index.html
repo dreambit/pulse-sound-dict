@@ -17,7 +17,7 @@
     integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
-<script src="http://webrtc.github.io/adapter/adapter-latest.js"></script>
+<script src="//cdn.temasys.com.sg/adapterjs/0.13.x/adapter.min.js"></script>
 <meta charset=utf-8 />
 <title>Angular JS Demo</title>
 </head>
@@ -80,9 +80,17 @@
                                     }));
                                   }
                                 };
-                                var errorHandler = function (e) {console.log("error" + e)};
-                                var offer = message.desc;
+                                var errorHandler = function (e) {console.log("error" + e.toString())};
+                                var offer = new RTCSessionDescription(message.desc);
+                                
                                 $scope.peerConnectiom.setRemoteDescription(offer);
+                                
+                                $scope.peerConnectiom.onaddstream = function (event) {
+                                  console.log("add stream");
+                                  attachMediaStream(document.getElementById("vid"), event.stream);
+                                };
+                                
+                                
                                 $scope.peerConnectiom.createAnswer(function (answer) {
                                   $scope.peerConnectiom.setLocalDescription(answer, function() {
                                     $scope.socket.send(JSON.stringify({
@@ -99,7 +107,7 @@
 
                                   "mandatory": {
                                   "OfferToReceiveAudio":true, 
-                                  "OfferToReceiveVideo":false
+                                  "OfferToReceiveVideo":true
                                   }
                                   });
                               
@@ -108,7 +116,7 @@
                                 $scope.$apply();
                                 $('#incomingCallModal').modal();
                             } else if (message.messageId == "CALL_ANSWER") {
-                              var answer = message.desc;
+                              var answer = new RTCSessionDescription(message.desc);
                               $scope.peerConnectiom.setRemoteDescription(answer);
                             }
                         };
@@ -145,13 +153,11 @@
                             $scope.peerConnectiom = new RTCPeerConnection(null, {
 
                             });
-                            $scope.dataChanal = $scope.peerConnectiom.createDataChannel("chat", {});
-                            $scope.dataChanal.onmessage = function (e) {
-                              console.log("Got message:", e.data);
-                            };
-                            $scope.dataChanal.onerror = function (err) {
-                              console.error("Channel Error:", err);
-                            };
+                            $scope.peerConnectiom.onaddstream = function(obj) {
+                              console.log("add stream");
+                              var video = document.querySelector('video');
+                              video.srcObject = obj.stream;
+                            }
                             $scope.peerConnectiom.onicecandidate = function(event) {
                               if (event.candidate) {
                                 console.log("candidate");
@@ -164,29 +170,26 @@
                                 }));
                               }
                             };
-                            var errorHandler = function (e) {console.log("error" + e)};
-                            $scope.peerConnectiom.createOffer(function (offer) {
-                              $scope.peerConnectiom.setLocalDescription(offer, function() {
-                                  $scope.socket.send(JSON.stringify({
-                                    messageId : "INCOMING_CALL",
-                                    to: {
-                                      userName: userName
-                                    },
-                                    from: {
-                                      userName: $scope.userName
-                                    },
-                                    desc: $scope.peerConnectiom.localDescription
-                                  }));
-                                  
-                              }, errorHandler);
-                            }, errorHandler,  {
+                            var errorHandler = function (e) {console.log("error" + e.toString())};
 
-                              "mandatory": {
-                              "OfferToReceiveAudio":true, 
-                              "OfferToReceiveVideo":false
-                              }
+                            navigator.mediaDevices.getUserMedia({audio: true, video: true}).then(function (stream){
+                              $scope.peerConnectiom.addStream(stream);
+                              $scope.peerConnectiom.createOffer().then(function (offer) {
+                                return $scope.peerConnectiom.setLocalDescription(offer);
+                              })
+                              .then(function () {
+                                $scope.socket.send(JSON.stringify({
+                                  messageId : "INCOMING_CALL",
+                                  to: {
+                                    userName: userName
+                                  },
+                                  from: {
+                                    userName: $scope.userName
+                                  },
+                                  desc: $scope.peerConnectiom.localDescription
+                                }));
                               });
-
+                            });
                         };
 
                         $scope.sendDataChanal = function() {
@@ -283,7 +286,7 @@
     </div>
     
     <button type="button" ng-click="sendDataChanal()" class="btn btn-default">Send data by chanal</button>
-    
+    <video id="vid" width="320" height="240" controls></video>
         <!-- Incoming call Modal -->
     <div class="modal fade" id="incomingCallModal" role="dialog">
         <div class="modal-dialog" style="width: 250px" >
