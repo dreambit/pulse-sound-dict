@@ -17,7 +17,7 @@
     integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
-<script src="//cdn.temasys.com.sg/adapterjs/0.13.x/adapter.min.js"></script>
+<script src="http://webrtc.github.io/adapter/adapter-latest.js"></script>
 <meta charset=utf-8 />
 <title>Angular JS Demo</title>
 </head>
@@ -80,14 +80,14 @@
                                     }));
                                   }
                                 };
-                                var errorHandler = function (e) {console.log("error" + e.toString())};
-                                var offer = new RTCSessionDescription(message.desc);
+                                var errorHandler = function (e) {console.log("error" + e)};
+                                var offer = message.desc;
                                 
                                 $scope.peerConnectiom.setRemoteDescription(offer);
                                 
                                 $scope.peerConnectiom.onaddstream = function (event) {
                                   console.log("add stream");
-                                  attachMediaStream(document.getElementById("vid"), event.stream);
+                                  document.getElementById("vid").srcObject = event.stream;
                                 };
                                 
                                 
@@ -107,7 +107,7 @@
 
                                   "mandatory": {
                                   "OfferToReceiveAudio":true, 
-                                  "OfferToReceiveVideo":true
+                                  "OfferToReceiveVideo":false
                                   }
                                   });
                               
@@ -116,7 +116,7 @@
                                 $scope.$apply();
                                 $('#incomingCallModal').modal();
                             } else if (message.messageId == "CALL_ANSWER") {
-                              var answer = new RTCSessionDescription(message.desc);
+                              var answer = message.desc;
                               $scope.peerConnectiom.setRemoteDescription(answer);
                             }
                         };
@@ -170,7 +170,7 @@
                                 }));
                               }
                             };
-                            var errorHandler = function (e) {console.log("error" + e.toString())};
+                            var errorHandler = function (e) {console.log("error" + e)};
 
                             navigator.mediaDevices.getUserMedia({audio: true, video: true}).then(function (stream){
                               $scope.peerConnectiom.addStream(stream);
