@@ -17,7 +17,7 @@
     integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
-<script src="http://webrtc.github.io/adapter/adapter-latest.js"></script>
+<script src="//cdn.temasys.com.sg/adapterjs/0.13.x/adapter.min.js"></script>
 <meta charset=utf-8 />
 <title>Angular JS Demo</title>
 </head>
@@ -67,9 +67,7 @@
                                 $('#incomingMessage').show();
                                 setTimeout(function(){$('#incomingMessage').hide();}, 2000);
                             } else if (message.messageId == "INCOMING_CALL") {
-                                $scope.peerConnectiom = new RTCPeerConnection(null, {
-
-                                });
+                                $scope.peerConnectiom = new RTCPeerConnection();
                                 $scope.peerConnectiom.onicecandidate = function(event) {
                                   if (event.candidate) {
                                     console.log("candidate");
@@ -81,42 +79,47 @@
                                   }
                                 };
                                 var errorHandler = function (e) {console.log("error" + e)};
-                                var offer = message.desc;
+                                var offer = new RTCSessionDescription(message.desc);
                                 
-                                $scope.peerConnectiom.setRemoteDescription(offer);
+                                $scope.peerConnectiom.setRemoteDescription(offer, function() {
+                                  console.log("Remote exec");
+                                  $scope.peerConnectiom.createAnswer(function (answer) {
+                                    $scope.peerConnectiom.setLocalDescription(answer, function() {
+                                      $scope.socket.send(JSON.stringify({
+                                        messageId : "CALL_ANSWER",
+                                        caller: message.from,
+                                        desc: $scope.peerConnectiom.localDescription
+                                      }));
+                                      $scope.peerConnectiom.ondatachannel = function (e) {
+                                        console.log("Yes");
+                                        e.channel.onmessage = function (m) { console.log(m) };
+                                      };
+                                    }, errorHandler);
+                                  }, errorHandler,  {
+
+                                    "mandatory": {
+                                    "OfferToReceiveAudio":true, 
+                                    "OfferToReceiveVideo":true
+                                    }
+                                    });
+                                }, function(e) { 
+                                  console.log("Could not set remote description. Reason: " + e); 
+                                });
                                 
                                 $scope.peerConnectiom.onaddstream = function (event) {
                                   console.log("add stream");
-                                  document.getElementById("vid").srcObject = event.stream;
+                                  attachMediaStream(document.getElementById("vid"), event.stream);
                                 };
                                 
                                 
-                                $scope.peerConnectiom.createAnswer(function (answer) {
-                                  $scope.peerConnectiom.setLocalDescription(answer, function() {
-                                    $scope.socket.send(JSON.stringify({
-                                      messageId : "CALL_ANSWER",
-                                      caller: message.from,
-                                      desc: $scope.peerConnectiom.localDescription
-                                    }));
-                                    $scope.peerConnectiom.ondatachannel = function (e) {
-                                      console.log("Yes");
-                                      e.channel.onmessage = function (m) { console.log(m) };
-                                    };
-                                  }, errorHandler);
-                                }, errorHandler,  {
-
-                                  "mandatory": {
-                                  "OfferToReceiveAudio":true, 
-                                  "OfferToReceiveVideo":false
-                                  }
-                                  });
+                                
                               
                               
                                 $scope.incomingCallUserName = message.from.userName;
-                                $scope.$apply();
-                                $('#incomingCallModal').modal();
+                                //$scope.$apply();
+                                //$('#incomingCallModal').modal();
                             } else if (message.messageId == "CALL_ANSWER") {
-                              var answer = message.desc;
+                              var answer = new RTCSessionDescription(message.desc);
                               $scope.peerConnectiom.setRemoteDescription(answer);
                             }
                         };
@@ -150,9 +153,7 @@
                         };
 
                         $scope.makeCall = function(userName) {
-                            $scope.peerConnectiom = new RTCPeerConnection(null, {
-
-                            });
+                            $scope.peerConnectiom = new RTCPeerConnection();
                             $scope.peerConnectiom.onaddstream = function(obj) {
                               console.log("add stream");
                               var video = document.querySelector('video');
@@ -174,7 +175,7 @@
 
                             navigator.mediaDevices.getUserMedia({audio: true, video: true}).then(function (stream){
                               $scope.peerConnectiom.addStream(stream);
-                              $scope.peerConnectiom.createOffer().then(function (offer) {
+                              $scope.peerConnectiom.createOffer({"offerToReceiveAudio":true,"offerToReceiveVideo":true}).then(function (offer) {
                                 return $scope.peerConnectiom.setLocalDescription(offer);
                               })
                               .then(function () {
