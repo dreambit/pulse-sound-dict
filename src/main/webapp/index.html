@@ -64,7 +64,7 @@
                             } else if (message.messageId == "ON_ICE_CANDIDATE") {
                               var iceCandidate = new RTCIceCandidate(message.candidate);
                               $scope.peerConnectiom.addIceCandidate(iceCandidate);
-                              console.log("ice added - " + iceCandidate);
+                              console.log("ice added - " + JSON.stringify(iceCandidate));
                             } else if (message.messageId == "USERS_LIST") {
                                 $scope.users = message.users;
                                 $scope.$apply();
@@ -91,44 +91,41 @@
                                 navigator.mediaDevices.getUserMedia({audio: true, video: false}).then(function (stream) {
                                     console.log("Ansver: Got media");
                                     $scope.peerConnectiom.addStream(stream);
-                                    $scope.peerConnectiom.setRemoteDescription(offer, function() {
+
+                                    $scope.peerConnectiom.setRemoteDescription(offer).then(function () {
                                         console.log("Remote exec");
-                                        $scope.peerConnectiom.createAnswer(function (answer) {
-                                          $scope.peerConnectiom.setLocalDescription(answer, function() {
-                                            $scope.socket.send(JSON.stringify({
-                                              messageId : "CALL_ANSWER",
-                                              caller: message.from,
-                                              desc: $scope.peerConnectiom.localDescription
-                                            }));
-                                            $scope.peerConnectiom.ondatachannel = function (e) {
-                                              console.log("Yes");
-                                              e.channel.onmessage = function (m) { console.log(m) };
-                                            };
-                                          }, errorHandler);
-                                        }, errorHandler,  {
+                                        $scope.peerConnectiom.createAnswer({ mandatory: { OfferToReceiveAudio: true, OfferToReceiveVideo: false } }).then(function (answer) {
+                                            $scope.peerConnectiom.setLocalDescription(answer).then(function() {
+                                                $scope.socket.send(JSON.stringify({
+                                                    messageId : "CALL_ANSWER",
+                                                    caller: message.from,
+                                                    desc: $scope.peerConnectiom.localDescription
+                                                  }));
+                                            })
+                                            .catch(function (e) {
+                                                console.log("Error setLocalDescription " + e);
+                                            });
+                                        })
+                                        .catch(function (e) {
+                                            console.log("Error createAnswer " + e);
+                                        });
+                                    })
+                                    .catch(function (e) {
+                                        console.log("Error setRemoteDescription " + e);
+                                    });
 
-                                          "mandatory": {
-                                          "OfferToReceiveAudio":true, 
-                                          "OfferToReceiveVideo":false
-                                          }
-                                          });
-                                      }, function(e) { 
-                                        console.log("Could not set remote description. Reason: " + e); 
-                                      });
+                                    $scope.peerConnectiom.onaddstream = function (event) {
+                                        console.log("add stream");
+                                        attachMediaStream(document.getElementById("vid"), event.stream);
+                                      };
+    
+                                      $scope.incomingCallUserName = message.from.userName;
+                                      $scope.$apply();
+                                      $('#incomingCallModal').modal();
+                                  })
+                                  .catch(function (e) {
+                                      console.log("Error getUserMedia " + e);
                                   });
-
-                                $scope.peerConnectiom.onaddstream = function (event) {
-                                  console.log("add stream");
-                                  attachMediaStream(document.getElementById("vid"), event.stream);
-                                };
-                                
-                                
-                                
-                              
-                              
-                                $scope.incomingCallUserName = message.from.userName;
-                                $scope.$apply();
-                                $('#incomingCallModal').modal();
                             } else if (message.messageId == "CALL_ANSWER") {
                               var answer = new RTCSessionDescription(message.desc);
                               $scope.peerConnectiom.setRemoteDescription(answer);
@@ -191,7 +188,7 @@
 
                             navigator.mediaDevices.getUserMedia({audio: true, video: false}).then(function (stream) {
                               $scope.peerConnectiom.addStream(stream);
-                              $scope.peerConnectiom.createOffer({"offerToReceiveAudio":true,"offerToReceiveVideo":false}).then(function (offer) {
+                              $scope.peerConnectiom.createOffer({ mandatory: { OfferToReceiveAudio: true, OfferToReceiveVideo: false } }).then(function (offer) {
                                 return $scope.peerConnectiom.setLocalDescription(offer);
                               })
                               .then(function () {
@@ -208,7 +205,7 @@
                               })
                               .catch(function (error) {
                                   console.log("Error - " + error);
-                              })
+                              });
                             });
                         };
 
