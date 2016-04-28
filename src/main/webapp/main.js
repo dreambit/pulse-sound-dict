@@ -98,7 +98,7 @@ function main($scope) {
         
                                     $scope.peerConnection.setRemoteDescription(offer).then(function () {
                                         log("Creating answer");
-                                        $scope.peerConnection.createAnswer({ mandatory: { OfferToReceiveAudio: true, OfferToReceiveVideo: false }}).then(function (answer) {
+                                        $scope.peerConnection.createAnswer().then(function (answer) {
                                             $scope.peerConnection.setLocalDescription(answer).then(function() {
                                                 send({
                                                     messageId : "CALL_ANSWER",
