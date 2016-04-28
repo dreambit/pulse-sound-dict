@@ -19,201 +19,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
 <script src="//cdn.temasys.com.sg/adapterjs/0.13.x/adapter.min.js"></script>
 <script   src="https://code.jquery.com/ui/1.12.0-rc.2/jquery-ui.js"   integrity="sha256-6HSLgn6Ao3PKc5ci8rwZfb//5QUu3ge2/Sw9KfLuvr8="   crossorigin="anonymous"></script>
+<script src="main.js" type="text/javascript"></script>
 <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.0-rc.2/themes/smoothness/jquery-ui.css">
 <meta charset=utf-8 />
 <title>Angular JS Demo</title>
 </head>
-<body ng-controller="ctrl">
+<body ng-controller="main">
 
     <style>
 .search {
 	margin-left: 10px;
 }
 </style>
-
-    <script>
-                    $(document).ready(function() {
-                        $('#myModal').modal();
-                        $(".close").click(function() {
-                            $("#myAlert").alert("close");
-                        });
-                        $(".close").click(function() {
-                            $("#myAlert").alert("show");
-                        });
-                        $(function() {
-                            $("#dialog").dialog();
-                        });
-                    });
-                    function ctrl($scope, $rootScope) {
-                        $scope.users = [];
-                        $scope.socket = new WebSocket("wss://" + location.host + "/pulse-rtc/users");
-                        $scope.peerConnectiom;
-                        $scope.dataChanal;
-                        $scope.socket.onmessage = function(message) {
-
-                            message = JSON.parse(message.data);
-
-                            if (message.messageId == "USER_LOGOUT") {
-                                $scope.users = _.filter($scope.users, function(u) {
-                                    return u.userName != message.userName
-                                });
-                                $scope.$apply();
-                            } else if (message.messageId == "USER_LOGIN") {
-                                $scope.users.push(message);
-                                $scope.$apply();
-                            } else if (message.messageId == "ON_ICE_CANDIDATE") {
-                              var iceCandidate = new RTCIceCandidate(message.candidate);
-                              $scope.peerConnectiom.addIceCandidate(iceCandidate);
-                              console.log("ice added - " + JSON.stringify(iceCandidate));
-                            } else if (message.messageId == "USERS_LIST") {
-                                $scope.users = message.users;
-                                $scope.$apply();
-                            } else if (message.messageId == "SEND_MESSAGE") {
-                                $('#incomingMessageContent').html(message.message);
-                                $('#incomingMessage').show();
-                                setTimeout(function(){$('#incomingMessage').hide();}, 2000);
-                            } else if (message.messageId == "INCOMING_CALL") {
-                                $scope.peerConnectiom = new RTCPeerConnection();
-                                $scope.peerConnectiom.onicecandidate = function(event) {
-                                  if (event.candidate) {
-                                    console.log("candidate");
-                                    $scope.socket.send(JSON.stringify({
-                                      messageId : "ON_ICE_CANDIDATE",
-                                      candidate: event.candidate,
-                                      to: message.from
-                                    }));
-                                  }
-                                };
-                                var errorHandler = function (e) {console.log("error" + e)};
-                                var offer = new RTCSessionDescription(message.desc);
-                                
-                                
-                                navigator.mediaDevices.getUserMedia({audio: true, video: false}).then(function (stream) {
-                                    console.log("Ansver: Got media");
-                                    $scope.peerConnectiom.addStream(stream);
-
-                                    $scope.peerConnectiom.setRemoteDescription(offer).then(function () {
-                                        console.log("Remote exec");
-                                        $scope.peerConnectiom.createAnswer({ mandatory: { OfferToReceiveAudio: true, OfferToReceiveVideo: false } }).then(function (answer) {
-                                            $scope.peerConnectiom.setLocalDescription(answer).then(function() {
-                                                $scope.socket.send(JSON.stringify({
-                                                    messageId : "CALL_ANSWER",
-                                                    caller: message.from,
-                                                    desc: $scope.peerConnectiom.localDescription
-                                                  }));
-                                            })
-                                            .catch(function (e) {
-                                                console.log("Error setLocalDescription " + e);
-                                            });
-                                        })
-                                        .catch(function (e) {
-                                            console.log("Error createAnswer " + e);
-                                        });
-                                    })
-                                    .catch(function (e) {
-                                        console.log("Error setRemoteDescription " + e);
-                                    });
-
-                                    $scope.peerConnectiom.onaddstream = function (event) {
-                                        console.log("add stream");
-                                        attachMediaStream(document.getElementById("vid"), event.stream);
-                                      };
-    
-                                      $scope.incomingCallUserName = message.from.userName;
-                                      $scope.$apply();
-                                      $('#incomingCallModal').modal();
-                                  })
-                                  .catch(function (e) {
-                                      console.log("Error getUserMedia " + e);
-                                  });
-                            } else if (message.messageId == "CALL_ANSWER") {
-                              var answer = new RTCSessionDescription(message.desc);
-                              $scope.peerConnectiom.setRemoteDescription(answer);
-                            }
-                        };
-
-                        $scope.login = function() {
-                            $scope.socket.send(JSON.stringify({
-                                messageId : "USER_LOGIN",
-                                userName : $scope.userName
-                            }));
-                            $('#myModal').modal('toggle');
-                        };
-
-                        $scope.setActiveUser = function(userName) {
-                            $scope.activeUser = userName;
-                            $('#sendMessageBlock').show();
-                        };
-
-                        $scope.sendMessage = function(userName, message) {
-                            $scope.socket.send(JSON.stringify({
-                                messageId : "SEND_MESSAGE",
-                                from : {
-                                    userName : $scope.userName
-                                },
-                                to : {
-                                    userName : userName
-                                },
-                                message : message
-                            }));
-                            $('#messageAre').val('');
-                            $('#sendMessageBlock').hide();
-                        };
-
-                        $scope.makeCall = function(userName) {
-                            $scope.peerConnectiom = new RTCPeerConnection();
-                            $scope.peerConnectiom.onaddstream = function(obj) {
-                              console.log("add stream");
-                              var video = document.querySelector('video');
-                              video.srcObject = obj.stream;
-                            }
-                            $scope.peerConnectiom.onicecandidate = function(event) {
-                              if (event.candidate) {
-                                console.log("candidate");
-                                $scope.socket.send(JSON.stringify({
-                                  messageId : "ON_ICE_CANDIDATE",
-                                  candidate: event.candidate,
-                                  to: {
-                                    userName: userName
-                                  }
-                                }));
-                              }
-                            };
-                            
-                            $scope.peerConnectiom.onaddstream = function (event) {
-                                console.log("add stream");
-                                attachMediaStream(document.getElementById("vid"), event.stream);
-                              };
-                            var errorHandler = function (e) {console.log("error" + e)};
-
-                            navigator.mediaDevices.getUserMedia({audio: true, video: false}).then(function (stream) {
-                              $scope.peerConnectiom.addStream(stream);
-                              $scope.peerConnectiom.createOffer({ mandatory: { OfferToReceiveAudio: true, OfferToReceiveVideo: false } }).then(function (offer) {
-                                return $scope.peerConnectiom.setLocalDescription(offer);
-                              })
-                              .then(function () {
-                                $scope.socket.send(JSON.stringify({
-                                  messageId : "INCOMING_CALL",
-                                  to: {
-                                    userName: userName
-                                  },
-                                  from: {
-                                    userName: $scope.userName
-                                  },
-                                  desc: $scope.peerConnectiom.localDescription
-                                }));
-                              })
-                              .catch(function (error) {
-                                  console.log("Error - " + error);
-                              });
-                            });
-                        };
-
-                        $scope.sendDataChanal = function() {
-                          $scope.dataChanal.send("Hi Peer!");
-                        }
-                    }
-                </script>
 
     <nav class="navbar navbar-default">
         <div class="container-fluid">
@@ -289,7 +106,7 @@
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
-                        <label for="usr">Name:</label> <input type="text" ng-model="userName" class="form-control"
+                        <label for="usr">Name:</label> <input type="text" ng-model="currentUser.userName" class="form-control"
                             id="usr">
                     </div>
                     <div class="form-group">

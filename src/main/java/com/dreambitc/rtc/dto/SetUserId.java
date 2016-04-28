@@ -2,11 +2,12 @@ package com.dreambitc.rtc.dto;
 
 import com.dreambitc.rtc.MessageConstants;
 
-public class UserLogin extends Message {
+public class SetUserId extends Message {
+
     private User user;
 
-    public UserLogin(User user) {
-        super(MessageConstants.IN_OUT_MESSAGE_ID_USER_LOGIN);
+    public SetUserId(User user) {
+        super(MessageConstants.OUT_MESSAGE_ID_SET_USER_ID);
         this.user = user;
     }
 

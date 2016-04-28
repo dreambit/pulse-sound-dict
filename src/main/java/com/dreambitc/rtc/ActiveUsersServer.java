@@ -2,6 +2,7 @@ package com.dreambitc.rtc;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import javax.websocket.OnClose;
@@ -18,6 +19,7 @@ import com.dreambitc.rtc.dto.OnIceCandidate;
 import com.dreambitc.rtc.dto.IncomingCall;
 import com.dreambitc.rtc.dto.Message;
 import com.dreambitc.rtc.dto.SendMessage;
+import com.dreambitc.rtc.dto.SetUserId;
 import com.dreambitc.rtc.dto.User;
 import com.dreambitc.rtc.dto.UserLogin;
 import com.dreambitc.rtc.dto.UserLogout;
@@ -32,7 +34,7 @@ public class ActiveUsersServer {
 
     @OnClose
     public void close(Session session) throws Exception {
-        notifyAll(session, new UserLogout((String) session.getUserProperties().get("userName")));
+        notifyAllExclusive(session, new UserLogout(ActiveUsersServerHelper.getUser(session)));
     }
 
     @OnError
@@ -58,71 +60,59 @@ public class ActiveUsersServer {
     }
 
     private void handleUserLoginMessage(UserLogin message, Session session) throws Exception {
-        session.getUserProperties().put("userName", message.getUserName());
-        notifyAll(session, message);
+        message.getUser().setId(UUID.randomUUID().toString());
+
+        session.getUserProperties().put("user", message.getUser());
+        session.getBasicRemote().sendObject(new SetUserId(message.getUser()));
+
+        notifyAllExclusive(session, message);
         sendUsersList(session);
 
     }
 
     private void handleSendMessageMessage(SendMessage message, Session session) {
-        session.getOpenSessions().stream().filter((Session s) -> {
-            return s.getUserProperties().get("userName").equals(message.getTo().getUserName());
-        }).findFirst().ifPresent((Session s) -> {
-            try {
-                s.getBasicRemote().sendObject(message);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+        session.getOpenSessions().stream()
+                                 .filter((Session s) -> message.getTo().equals(ActiveUsersServerHelper.getUser(s)))
+                                 .findFirst()
+                                 .ifPresent((Session s) -> ActiveUsersServerHelper.sendMessage(s, message));
     }
 
     private void handleIncomingCallMessage(IncomingCall message, Session session) {
-        session.getOpenSessions().stream().filter((Session s) -> {
-            return s.getUserProperties().get("userName").equals(message.getTo().getUserName());
-        }).findFirst().ifPresent((Session s) -> {
-            try {
-                s.getBasicRemote().sendObject(message);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+        session.getOpenSessions().stream()
+                                 .filter((Session s) -> message.getTo().equals(ActiveUsersServerHelper.getUser(s)))
+                                 .findFirst()
+                                 .ifPresent((Session s) -> ActiveUsersServerHelper.sendMessage(s, message));
     }
 
     private void handleIceCandidateMessage(OnIceCandidate message, Session session) {
-        session.getOpenSessions().stream().filter((Session s) -> {
-            return s.getUserProperties().get("userName").equals(message.getTo().getUserName());
-        }).findFirst().ifPresent((Session s) -> {
-            try {
-                s.getBasicRemote().sendObject(message);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+        session.getOpenSessions().stream()
+                                 .filter((Session s) -> message.getTo().equals(ActiveUsersServerHelper.getUser(s)))
+                                 .findFirst()
+                                 .ifPresent((Session s) -> ActiveUsersServerHelper.sendMessage(s, message));
     }
 
     private void handleAnswerCallMessage(CallAnswer message, Session session) {
-        session.getOpenSessions().stream().filter((Session s) -> {
-            return s.getUserProperties().get("userName").equals(message.getCaller().getUserName());
-        }).findFirst().ifPresent((Session s) -> {
-            try {
-                s.getBasicRemote().sendObject(message);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+        session.getOpenSessions().stream()
+                                 .filter((Session s) -> message.getCaller().equals(ActiveUsersServerHelper.getUser(s)))
+                                 .findFirst()
+                                 .ifPresent((Session s) -> ActiveUsersServerHelper.sendMessage(s, message));
     }
 
-    private void notifyAll(Session session, Object message) throws Exception {
-        for (Session userSession : session.getOpenSessions()) {
-            userSession.getBasicRemote().sendObject(message);
-        }
+    private void notifyAllExclusive(Session session, Message message) throws Exception {
+        User currentUser = (User) session.getUserProperties().get("user");
+
+        session.getOpenSessions().stream()
+                                 .filter((Session s) -> !currentUser.equals(s.getUserProperties().get("user")))
+                                 .forEach((Session s) -> ActiveUsersServerHelper.sendMessage(s, message));
     }
 
     private void sendUsersList(Session session) throws Exception {
+        User currentUser = (User) session.getUserProperties().get("user");
 
-        Collection<User> users = session.getOpenSessions().stream().map((Session s) -> {
-            return new User((String) s.getUserProperties().get("userName"));
-        }).collect(Collectors.toList());
+        Collection<User> users = session.getOpenSessions().stream()
+                                                          .map((Session s) -> (User) s.getUserProperties().get("user"))
+                                                          .filter((User u) -> !u.equals(currentUser))
+                                                          .collect(Collectors.toList());
 
         session.getBasicRemote().sendObject(new ActiveUsersList(users));
     }

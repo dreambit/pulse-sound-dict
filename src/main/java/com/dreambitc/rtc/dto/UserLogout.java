@@ -4,19 +4,19 @@ import com.dreambitc.rtc.MessageConstants;
 
 public class UserLogout extends Message {
 
-    private String userName;
+    private User user;
 
-    public UserLogout(String userName) {
+    public UserLogout(User user) {
         super(MessageConstants.IN_OUT_MESSAGE_ID_USER_LOGOUT);
-        this.userName = userName;
+        this.user = user;
     }
 
-    public String getUserName() {
-        return userName;
+    public User getUser() {
+        return user;
     }
 
-    public void setUserName(String userName) {
-        this.userName = userName;
+    public void setUser(User user) {
+        this.user = user;
     }
 
 }

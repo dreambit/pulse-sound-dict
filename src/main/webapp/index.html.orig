@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html ng-app>
+<head>
+<script src="https://code.jquery.com/jquery-2.2.3.min.js"
+    integrity="sha256-a23g1Nt4dtEYOj7bR+vTu7+T8VP13humZFBJNIYoEJo=" crossorigin="anonymous"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.1.5/angular.min.js"></script>
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css"
+    integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css"
+    integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
+    integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<<<<<<< Updated upstream
+<script src="//cdn.temasys.com.sg/adapterjs/0.13.x/adapter.min.js"></script>
+=======
+
+<script   src="https://code.jquery.com/ui/1.12.0-rc.2/jquery-ui.js"   integrity="sha256-6HSLgn6Ao3PKc5ci8rwZfb//5QUu3ge2/Sw9KfLuvr8="   crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.0-rc.2/themes/smoothness/jquery-ui.css">
+>>>>>>> Stashed changes
+<meta charset=utf-8 />
+<title>Angular JS Demo</title>
+</head>
+<body ng-controller="ctrl">
+
+    <style>
+.search {
+	margin-left: 10px;
+}
+</style>
+
+    <script>
+                    $(document).ready(function() {
+                        $('#myModal').modal();
+                        $(".close").click(function() {
+                            $("#myAlert").alert("close");
+                        });
+                        $(".close").click(function() {
+                            $("#myAlert").alert("show");
+                        });
+                        $(function() {
+                            $("#dialog").dialog();
+                        });
+                    });
+                    function ctrl($scope, $rootScope) {
+                        $scope.users = [];
+                        $scope.socket = new WebSocket("ws://" + location.host + "/pulse-rtc/users");
+                        $scope.peerConnectiom;
+                        $scope.dataChanal;
+                        $scope.socket.onmessage = function(message) {
+
+                            message = JSON.parse(message.data);
+
+                            if (message.messageId == "USER_LOGOUT") {
+                                $scope.users = _.filter($scope.users, function(u) {
+                                    return u.userName != message.userName
+                                });
+                                $scope.$apply();
+                            } else if (message.messageId == "USER_LOGIN") {
+                                $scope.users.push(message);
+                                $scope.$apply();
+                            } else if (message.messageId == "ON_ICE_CANDIDATE") {
+                              var iceCandidate = new RTCIceCandidate(message.candidate);
+                              $scope.peerConnectiom.addIceCandidate(iceCandidate);
+                            } else if (message.messageId == "USERS_LIST") {
+                                $scope.users = message.users;
+                                $scope.$apply();
+                            } else if (message.messageId == "SEND_MESSAGE") {
+                                $('#incomingMessageContent').html(message.message);
+                                $('#incomingMessage').show();
+                                setTimeout(function(){$('#incomingMessage').hide();}, 2000);
+                            } else if (message.messageId == "INCOMING_CALL") {
+                                $scope.peerConnectiom = new RTCPeerConnection();
+                                $scope.peerConnectiom.onicecandidate = function(event) {
+                                  if (event.candidate) {
+                                    console.log("candidate");
+                                    $scope.socket.send(JSON.stringify({
+                                      messageId : "ON_ICE_CANDIDATE",
+                                      candidate: event.candidate,
+                                      to: message.to
+                                    }));
+                                  }
+                                };
+                                var errorHandler = function (e) {console.log("error" + e)};
+                                var offer = new RTCSessionDescription(message.desc);
+                                
+                                $scope.peerConnectiom.setRemoteDescription(offer, function() {
+                                  console.log("Remote exec");
+                                  $scope.peerConnectiom.createAnswer(function (answer) {
+                                    $scope.peerConnectiom.setLocalDescription(answer, function() {
+                                      $scope.socket.send(JSON.stringify({
+                                        messageId : "CALL_ANSWER",
+                                        caller: message.from,
+                                        desc: $scope.peerConnectiom.localDescription
+                                      }));
+                                      $scope.peerConnectiom.ondatachannel = function (e) {
+                                        console.log("Yes");
+                                        e.channel.onmessage = function (m) { console.log(m) };
+                                      };
+                                    }, errorHandler);
+                                  }, errorHandler,  {
+
+                                    "mandatory": {
+                                    "OfferToReceiveAudio":true, 
+                                    "OfferToReceiveVideo":true
+                                    }
+                                    });
+                                }, function(e) { 
+                                  console.log("Could not set remote description. Reason: " + e); 
+                                });
+                                
+                                $scope.peerConnectiom.onaddstream = function (event) {
+                                  console.log("add stream");
+                                  attachMediaStream(document.getElementById("vid"), event.stream);
+                                };
+                                
+                                
+                                
+                              
+                              
+                                $scope.incomingCallUserName = message.from.userName;
+                                //$scope.$apply();
+                                //$('#incomingCallModal').modal();
+                            } else if (message.messageId == "CALL_ANSWER") {
+                              var answer = new RTCSessionDescription(message.desc);
+                              $scope.peerConnectiom.setRemoteDescription(answer);
+                            }
+                        };
+
+                        $scope.login = function() {
+                            $scope.socket.send(JSON.stringify({
+                                messageId : "USER_LOGIN",
+                                userName : $scope.userName
+                            }));
+                            $('#myModal').modal('toggle');
+                        };
+
+                        $scope.setActiveUser = function(userName) {
+                            $scope.activeUser = userName;
+                            $('#sendMessageBlock').show();
+                        };
+
+                        $scope.sendMessage = function(userName, message) {
+                            $scope.socket.send(JSON.stringify({
+                                messageId : "SEND_MESSAGE",
+                                from : {
+                                    userName : $scope.userName
+                                },
+                                to : {
+                                    userName : userName
+                                },
+                                message : message
+                            }));
+                            $('#messageAre').val('');
+                            $('#sendMessageBlock').hide();
+                        };
+
+                        $scope.makeCall = function(userName) {
+                            $scope.peerConnectiom = new RTCPeerConnection();
+                            $scope.peerConnectiom.onaddstream = function(obj) {
+                              console.log("add stream");
+                              var video = document.querySelector('video');
+                              video.srcObject = obj.stream;
+                            }
+                            $scope.peerConnectiom.onicecandidate = function(event) {
+                              if (event.candidate) {
+                                console.log("candidate");
+                                $scope.socket.send(JSON.stringify({
+                                  messageId : "ON_ICE_CANDIDATE",
+                                  candidate: event.candidate,
+                                  to: {
+                                    userName: userName
+                                  }
+                                }));
+                              }
+                            };
+                            var errorHandler = function (e) {console.log("error" + e)};
+
+                            navigator.mediaDevices.getUserMedia({audio: true, video: true}).then(function (stream){
+                              $scope.peerConnectiom.addStream(stream);
+                              $scope.peerConnectiom.createOffer({"offerToReceiveAudio":true,"offerToReceiveVideo":true}).then(function (offer) {
+                                return $scope.peerConnectiom.setLocalDescription(offer);
+                              })
+                              .then(function () {
+                                $scope.socket.send(JSON.stringify({
+                                  messageId : "INCOMING_CALL",
+                                  to: {
+                                    userName: userName
+                                  },
+                                  from: {
+                                    userName: $scope.userName
+                                  },
+                                  desc: $scope.peerConnectiom.localDescription
+                                }));
+                              });
+                            });
+                        };
+
+                        $scope.sendDataChanal = function() {
+                          $scope.dataChanal.send("Hi Peer!");
+                        }
+                    }
+                </script>
+
+    <nav class="navbar navbar-default">
+        <div class="container-fluid">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse"
+                    data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+                    <span class="sr-only">Toggle navigation</span> <span class="icon-bar"></span> <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#">Brand</a>
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav">
+                    <li class="active"><a href="#">Link <span class="sr-only">(current)</span></a></li>
+                    <li><a href="#">Link</a></li>
+                    <li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button"
+                        aria-haspopup="true" aria-expanded="false">Dropdown <span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li><a href="#">Action</a></li>
+                            <li><a href="#">Another action</a></li>
+                            <li><a href="#">Something else here</a></li>
+                            <li role="separator" class="divider"></li>
+                            <li><a href="#">Separated link</a></li>
+                            <li role="separator" class="divider"></li>
+                            <li><a href="#">One more separated link</a></li>
+                        </ul></li>
+                </ul>
+                <form class="navbar-form navbar-left" role="search">
+                    <div class="form-group">
+                        <input type="text" class="form-control" placeholder="Search">
+                    </div>
+                    <button type="submit" class="btn btn-default">Submit</button>
+                </form>
+                <ul class="nav navbar-nav navbar-right">
+                    <li><a href="#">Link</a></li>
+                    <li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button"
+                        aria-haspopup="true" aria-expanded="false">Dropdown <span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li><a href="#">Action</a></li>
+                            <li><a href="#">Another action</a></li>
+                            <li><a href="#">Something else here</a></li>
+                            <li role="separator" class="divider"></li>
+                            <li><a href="#">Separated link</a></li>
+                        </ul></li>
+                </ul>
+            </div>
+            <!-- /.navbar-collapse -->
+        </div>
+        <!-- /.container-fluid -->
+    </nav>
+    
+    <div id="dialog" title="Basic dialog">
+  <p>This is the default dialog which is useful for displaying information. The dialog window can be moved, resized and closed with the 'x' icon.</p>
+</div>
+ 
+
+    <div class="alert alert-success" style="float: right; width: 30%; display: none;" id="incomingMessage">
+        <span id="incomingMessageContent">
+        </span>
+    </div>
+    <!-- Modal -->
+    <div class="modal fade" id="myModal" role="dialog">
+        <div class="modal-dialog">
+
+            <!-- Modal content-->
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">Modal Header</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="usr">Name:</label> <input type="text" ng-model="userName" class="form-control"
+                            id="usr">
+                    </div>
+                    <div class="form-group">
+                        <label for="pwd">Password:</label> <input type="password" class="form-control" id="pwd">
+                    </div>
+                    <div class="form-group">
+                        <button type="button" ng-click="login()" class="btn btn-default">Enter</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    
+    <button type="button" ng-click="sendDataChanal()" class="btn btn-default">Send data by chanal</button>
+    <video id="vid" width="320" height="240" controls></video>
+        <!-- Incoming call Modal -->
+    <div class="modal fade" id="incomingCallModal" role="dialog">
+        <div class="modal-dialog" style="width: 250px" >
+
+            <!-- Modal content-->
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">Incoming call from <b>{{incomingCallUserName}}</b></h4>
+                </div>
+                <div class="modal-body">
+                <span>
+                    <table style="width: 100%">
+                      <tr>
+                        <td align="left"><img src="phone_number_telephone-512.png" width="64" height="64"></td>
+                        <td align="right"><img src="17-512.png" width="64" height="64"></td>
+                      </tr>
+                    </table>
+                    </span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    
+
+    <br />
+    <br />
+    <center>
+        <div style="width: 25%">
+            <table class="table table-bordered table-hover">
+                <tbody>
+                    <tr ng-repeat="user in users">
+                        <th>{{user.userName}}
+                        <img ng-click="makeCall(user.userName)" style="float: right" src="call-center-indovision-a9864d-w240.png" width="24" height="24">
+                        <img ng-click="setActiveUser(user.userName)" style="float: right; margin-right: 3px" src="message-icon.png" width="24" height="24" />
+                        </th>
+                    </tr>
+                </tbody>
+            </table>
+            <div id="sendMessageBlock" style="display: none">
+                <textarea id="messageAre" ng-model="message" style="width: 100%; height: 100px"></textarea>
+                <button ng-click="sendMessage(activeUser, message)" type="button" class="btn btn-info">Send</button>
+            </div>
+        </div>
+    </center>
+
+
+
+
+
+</body>
+</html>
