@@ -53,6 +53,11 @@
                 <groupId>org.apache.tomcat.maven</groupId>
                 <artifactId>tomcat7-maven-plugin</artifactId>
                 <version>2.2</version>
+                <configuration>
+                    <httpsPort>8443</httpsPort>
+                    <keystoreFile>D:\Users\Orlechuk\mycert.pfx</keystoreFile>
+                    <keystorePass>123456</keystorePass>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.openejb.maven</groupId>
