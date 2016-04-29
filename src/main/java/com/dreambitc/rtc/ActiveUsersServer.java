@@ -17,6 +17,7 @@ import com.dreambitc.rtc.dto.ActiveUsersList;
 import com.dreambitc.rtc.dto.CallAnswer;
 import com.dreambitc.rtc.dto.OnIceCandidate;
 import com.dreambitc.rtc.dto.IncomingCall;
+import com.dreambitc.rtc.dto.IncomingMessage;
 import com.dreambitc.rtc.dto.Message;
 import com.dreambitc.rtc.dto.SendMessage;
 import com.dreambitc.rtc.dto.SetUserId;
@@ -74,7 +75,7 @@ public class ActiveUsersServer {
         session.getOpenSessions().stream()
                                  .filter((Session s) -> message.getTo().equals(ActiveUsersServerHelper.getUser(s)))
                                  .findFirst()
-                                 .ifPresent((Session s) -> ActiveUsersServerHelper.sendMessage(s, message));
+                                 .ifPresent((Session s) -> ActiveUsersServerHelper.sendMessage(s, IncomingMessage.from(message)));
     }
 
     private void handleIncomingCallMessage(IncomingCall message, Session session) {
