@@ -14,9 +14,6 @@ $(document).ready(function() {
     $(".close").click(function() {
         $("#myAlert").alert("show");
     });
-    $(function() {
-        $("#dialog").dialog();
-    });
 });
 
 function main($scope) {
@@ -66,57 +63,7 @@ function main($scope) {
                         handleSendIdMessage = function (jsonMessageData) {
                             $scope.currentUser.id = jsonMessageData.user.id;
                         },
-    
-                        handleIncomingCall = function (jsonMessageData) {
-                            log("Incomming call: " + JSON.stringify(jsonMessageData));
-                            var offer = new RTCSessionDescription(jsonMessageData.desc),
-    
-                                /**
-                                 *     private User from;
-                                 *     private User to;
-                                 *     private RTCSessionDescription desc;
-                                 */
-                                onGetUserMedia = function (stream) {
-                                    $scope.peerConnection.onicecandidate = function(event) {
-                                      if (event.candidate) {
-                                        log("On ICE candidate: " + JSON.stringify(event.candidate));
-                                        send({
-                                            messageId : "ON_ICE_CANDIDATE",
-                                            candidate: event.candidate,
-                                            to: jsonMessageData.from
-                                        });
-                                      }
-                                    };
-    
-                                    $scope.peerConnection.onaddstream = function (event) {
-                                        log("Remote peer has added stream: " + JSON.stringify(event));
-                                        attachMediaStream(document.getElementById("vid"), event.stream);
-                                    };
-    
-                                    log("Got media stream");
-                                    $scope.peerConnection.addStream(stream);
-        
-                                    $scope.peerConnection.setRemoteDescription(offer).then(function () {
-                                        log("Creating answer");
-                                        $scope.peerConnection.createAnswer().then(function (answer) {
-                                            $scope.peerConnection.setLocalDescription(answer).then(function() {
-                                                send({
-                                                    messageId : "CALL_ANSWER",
-                                                    caller: jsonMessageData.from,
-                                                    desc: $scope.peerConnection.localDescription
-                                                });
-                                            })
-                                            .catch(e => log(e));
-                                        })
-                                        .catch(e => log(e));
-                                    })
-                                    .catch(e => log(e));
-                                };
-    
-                                $scope.peerConnection = new RTCPeerConnection();
-                                window.navigator.getUserMedia({audio: true, video: false}, onGetUserMedia, e => log(e));
-                        },
-    
+
                         /**
                          * {
                          *   desc: session description
@@ -146,7 +93,7 @@ function main($scope) {
                                 handleSendMessage(jsonData);
                                 break;
                             case "INCOMING_CALL":
-                                handleIncomingCall(jsonData);
+                                $scope.incommingCall(jsonData);
                                 break;
                             case "CALL_ANSWER":
                                 handleCallAnswer(jsonData);
@@ -167,7 +114,6 @@ function main($scope) {
                  * }
                  * 
                  */
-                $scope.users = [];
                 $scope.peerConnection = null;
                 $scope.socket = new WebSocket("wss://" + location.host + "/pulse-rtc/users");
     
@@ -200,10 +146,23 @@ function main($scope) {
                     $('#sendMessageBlock').hide();
                 };
 
+                $scope.endCall = function () {
+                    $scope.localStream.getTracks().forEach(function(track) {
+                        track.stop();
+                    });
+                    $scope.peerConnection.close();
+                    $scope.peerConnection = null;
+                    $("#callDialog").dialog("close");
+                };
+                
+
                 $scope.makeCall = function(userId) {
                     var onGetUserMedia = function (stream) {
                       log("onGetUserMedia");
+
                       $scope.peerConnection.addStream(stream);
+                      $scope.localStream = stream;
+
                       $scope.peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false }).then(function (offer) {
                         $scope.peerConnection.setLocalDescription(offer).then(function() {
                             send({
@@ -216,6 +175,10 @@ function main($scope) {
                             });
                         }).catch(e => log(e));
                       }).catch(e => log(e));
+                      $("#callDialog").dialog({
+                          closeOnEscape: false,
+                          resizable: false
+                      });
                     };
 
                     $scope.peerConnection = new RTCPeerConnection();
@@ -224,6 +187,13 @@ function main($scope) {
                       log("Remote peer has added stream: " + JSON.stringify(event));
                       attachMediaStream(document.getElementById("vid"), event.stream);
                     }
+
+//                    $scope.peerConnection.oniceconnectionstatechange = function() {
+//                        if($scope.peerConnection || "".iceConnectionState == 'disconnected') {
+//                            alert("Connection was lost");
+//                            $scope.endCall();
+//                        }
+//                    }
 
                     $scope.peerConnection.onicecandidate = function(event) {
                       if (event.candidate) {
@@ -240,13 +210,81 @@ function main($scope) {
 
                     window.navigator.getUserMedia({audio: true, video: false}, onGetUserMedia, e => log(e));
                 };
-
-                $scope.currentUser = {
-                };
     
                 setupSocketMessageHandler();
             };
 
+        $scope.handleIncomingCall = function () {
+            var jsonMessageData = $scope.incommingCall;
+            log("Incomming call: " + JSON.stringify(jsonMessageData));
+            var offer = new RTCSessionDescription(jsonMessageData.desc),
+
+                /**
+                 *     private User from;
+                 *     private User to;
+                 *     private RTCSessionDescription desc;
+                 */
+                onGetUserMedia = function (stream) {
+                    $scope.peerConnection.onicecandidate = function(event) {
+                      if (event.candidate) {
+                        log("On ICE candidate: " + JSON.stringify(event.candidate));
+                        send({
+                            messageId : "ON_ICE_CANDIDATE",
+                            candidate: event.candidate,
+                            to: jsonMessageData.from
+                        });
+                      }
+                    };
+
+                    $scope.peerConnection.onaddstream = function (event) {
+                        log("Remote peer has added stream: " + JSON.stringify(event));
+                        attachMediaStream(document.getElementById("vid"), event.stream);
+                    };
+
+                    log("Got media stream");
+                    $scope.peerConnection.addStream(stream);
+
+                    $scope.peerConnection.setRemoteDescription(offer).then(function () {
+                        log("Creating answer");
+                        $scope.peerConnection.createAnswer().then(function (answer) {
+                            $scope.peerConnection.setLocalDescription(answer).then(function() {
+                                send({
+                                    messageId : "CALL_ANSWER",
+                                    caller: jsonMessageData.from,
+                                    desc: $scope.peerConnection.localDescription
+                                });
+                            })
+                            .catch(e => log(e));
+                        })
+                        .catch(e => log(e));
+                    })
+                    .catch(e => log(e));
+                };
+
+                window.navigator.getUserMedia({audio: true, video: false}, onGetUserMedia, e => log(e));
+        };
+
+        $scope.incommingCall = function (jsonMessageData) {
+            $scope.peerConnection = new RTCPeerConnection();
+            $scope.incommingCall = jsonMessageData;
+            $("#incommingCall").dialog({
+                closeOnEscape: false,
+                resizable: false,
+                minHeight: 0
+            });
+        }
+
+        $scope.declineCall = function () {
+            $("#incommingCall").dialog("close");
+        }
+
+        $scope.answerCall = function () {
+            $("#incommingCall").dialog("close");
+            $scope.handleIncomingCall();
+        }
+
+        $scope.users = [];
+        $scope.currentUser = {};
         setup();
     });
 

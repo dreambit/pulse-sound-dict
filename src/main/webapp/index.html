@@ -84,10 +84,31 @@
         </div>
         <!-- /.container-fluid -->
     </nav>
-    
-    <div id="dialog" title="Basic dialog">
-  <p>This is the default dialog which is useful for displaying information. The dialog window can be moved, resized and closed with the 'x' icon.</p>
-</div>
+
+    <div id="callDialog" title="Call" style="display: none;">
+      <center>
+          <div>
+              <img src="no-user-image.gif" />
+              <b>Rezvan</b
+          </div>
+          <br />
+          <br />
+          <button ng-click="endCall()" type="button" class="btn btn-danger">End Call</button>
+      </center>
+    </div>
+
+    <div id="incommingCall" title="Incomming call" style="display: none;">
+      <table style="width: 100%">
+          <tr>
+            <td align="left">
+              <button ng-click="answerCall()" type="button" class="btn btn-success">Answer</button>
+            </td>
+            <td align="right">
+              <button ng-click="declineCall()" type="button" class="btn btn-danger">Decline</button>
+            </td>
+          </tr>
+      </table>
+    </div>
  
 
     <div class="alert alert-success" style="float: right; width: 30%; display: none;" id="incomingMessage">
@@ -123,8 +144,7 @@
 
         </div>
     </div>
-    
-    <button type="button" ng-click="sendDataChanal()" class="btn btn-default">Send data by chanal</button>
+
     <audio id="vid" width="320" height="240" controls autoplay></audio>
         <!-- Incoming call Modal -->
     <div class="modal fade" id="incomingCallModal" role="dialog">
