@@ -23,6 +23,7 @@ function main($scope) {
         $scope.peerConnection = null;
         $scope.socket = new WebSocket("wss://" + location.host + "/pulse-rtc/users");
         $scope.currentUser = {};
+        $scope.activeUser = {};
 
         $scope.send = function (object) {
             $scope.socket.send(JSON.stringify(object));
@@ -34,6 +35,22 @@ function main($scope) {
                 user : $scope.currentUser
             });
             $('#myModal').modal('toggle');
+        };
+
+        $scope.setActiveUser = function (user) {
+            $scope.activeUser = user;
+            $('#sendMessageBlock').show();
+        };
+
+        $scope.sendMessage = function (user, message) {
+            $scope.send({
+                messageId : "SEND_MESSAGE",
+                from: $scope.currentUser,
+                to: user,
+                message : message
+            });
+            $('#messageAre').val('');
+            $('#sendMessageBlock').hide();
         };
 
         $scope.makeCall = function (user) {
@@ -79,8 +96,8 @@ function main($scope) {
             $scope.$apply();
         };
 
-        $scope.handleSendMessage = function (jsonMessageData) {
-            log("handleSendMessage: " + JSON.stringify(jsonMessageData));
+        $scope.handleIncomingMessage = function (jsonMessageData) {
+            log("handleIncomingMessage: " + JSON.stringify(jsonMessageData));
             $('#incomingMessageContent').html(jsonMessageData.message);
             $('#incomingMessage').show();
         };
@@ -100,13 +117,17 @@ function main($scope) {
             log("Incomming ice candidate was added: " + JSON.stringify(iceCandidate));
         };
 
-        $scope.handleIncomingCall = function () {
+        $scope.handleIncomingCall = function (jsonMessageData) {
             log("handleIncomingCall: " + JSON.stringify(jsonMessageData));
-        }
+        };
 
-        $scope.handleMetadata = function () {
-            log("handleMetadata: " + JSON.stringify(jsonMessageData));
-        }
+        $scope.handleSDPOffer = function () {
+            log("handleSDPOffer: " + JSON.stringify(jsonMessageData));
+        };
+ 
+        $scope.handleSDPAnswer = function () {
+            log("handleSDPAnswer: " + JSON.stringify(jsonMessageData));
+        };
 
         $scope.socket.onmessage = function(message) {
             var jsonData = JSON.parse(message.data);
@@ -125,7 +146,7 @@ function main($scope) {
                     $scope.handleUsersList(jsonData);
                     break;
                 case "INCOMING_MESSAGE":
-                    $scope.handleSendMessage(jsonData);
+                    $scope.handleIncomingMessage(jsonData);
                     break;
                 case "INCOMING_CALL":
                     $scope.handleIncomingCall(jsonData);
@@ -136,8 +157,11 @@ function main($scope) {
                 case "SET_USER_ID":
                     $scope.handleSendIdMessage(jsonData);
                     break;
-                case "META_DATA":
-                    $scope.handleMetadata(jsonData);
+                case "SDP_ANSWER":
+                    $scope.handleSDPAnswer(jsonData);
+                    break;
+                case "SDP_OFFER":
+                    $scope.handleSDPOffer(jsonData);
                     break;
                 default:
                     break;

@@ -1,8 +1,10 @@
-package com.dreambitc.rtc.dto;
+package com.dreambitc.rtc.messages.out;
 
 import java.util.Collection;
 
 import com.dreambitc.rtc.MessageConstants;
+import com.dreambitc.rtc.dto.User;
+import com.dreambitc.rtc.messages.Message;
 
 public class ActiveUsersList extends Message {
 

@@ -1,6 +1,8 @@
-package com.dreambitc.rtc.dto;
+package com.dreambitc.rtc.messages;
 
 import com.dreambitc.rtc.MessageConstants;
+import com.dreambitc.rtc.dto.RTCSessionDescription;
+import com.dreambitc.rtc.dto.User;
 
 public class CallAnswer extends Message {
     User caller;

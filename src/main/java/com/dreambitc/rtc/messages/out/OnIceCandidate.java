@@ -1,6 +1,9 @@
-package com.dreambitc.rtc.dto;
+package com.dreambitc.rtc.messages.out;
 
 import com.dreambitc.rtc.MessageConstants;
+import com.dreambitc.rtc.dto.IceCandidate;
+import com.dreambitc.rtc.dto.User;
+import com.dreambitc.rtc.messages.Message;
 
 public class OnIceCandidate extends Message {
 

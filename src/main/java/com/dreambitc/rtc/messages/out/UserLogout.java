@@ -1,13 +1,15 @@
-package com.dreambitc.rtc.dto;
+package com.dreambitc.rtc.messages.out;
 
 import com.dreambitc.rtc.MessageConstants;
+import com.dreambitc.rtc.dto.User;
+import com.dreambitc.rtc.messages.Message;
 
 public class UserLogout extends Message {
 
     private User user;
 
     public UserLogout(User user) {
-        super(MessageConstants.IN_OUT_MESSAGE_ID_USER_LOGOUT);
+        super(MessageConstants.OUT_MESSAGE_ID_USER_LOGOUT);
         this.user = user;
     }
 

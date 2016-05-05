@@ -1,21 +1,20 @@
-package com.dreambitc.rtc.dto;
+package com.dreambitc.rtc.messages.in;
 
 import com.dreambitc.rtc.MessageConstants;
+import com.dreambitc.rtc.dto.User;
+import com.dreambitc.rtc.messages.Message;
 
-public class IncomingMessage extends Message {
+public class SendMessage extends Message {
+
     private String message;
     private User from;
     private User to;
 
-    public IncomingMessage(String message, User from, User to) {
-        super(MessageConstants.OUT_MESSAGE_ID_INCOMING_MESSAGE);
+    public SendMessage(String message, User from, User to) {
+        super(MessageConstants.IN_MESSAGE_ID_SEND_MESSAGE);
         this.message = message;
         this.from = from;
         this.to = to;
-    }
-
-    public static IncomingMessage from(SendMessage sendMessage) {
-        return new IncomingMessage(sendMessage.getMessage(), sendMessage.getFrom(), sendMessage.getTo());
     }
 
     public String getMessage() {

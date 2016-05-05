@@ -1,4 +1,4 @@
-package com.dreambitc.rtc.dto;
+package com.dreambitc.rtc.messages;
 
 public abstract class Message {
     protected String messageId;
