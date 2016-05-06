@@ -1,9 +1,8 @@
-package com.dreambitc.rtc.messages.out;
+package com.dreambitc.rtc.messages;
 
 import com.dreambitc.rtc.MessageConstants;
 import com.dreambitc.rtc.dto.IceCandidate;
 import com.dreambitc.rtc.dto.User;
-import com.dreambitc.rtc.messages.Message;
 
 public class OnIceCandidate extends Message {
 
@@ -11,7 +10,7 @@ public class OnIceCandidate extends Message {
     private IceCandidate candidate;
 
     public OnIceCandidate(User to, IceCandidate candidate) {
-        super(MessageConstants.OUT_MESSAGE_ID_ON_ICE_CANDIDATE);
+        super(MessageConstants.IN_OUT_MESSAGE_ID_ON_ICE_CANDIDATE);
         this.to = to;
         this.candidate = candidate;
     }

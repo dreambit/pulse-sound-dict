@@ -10,7 +10,11 @@ import javax.websocket.EncodeException;
 import javax.websocket.Session;
 
 import com.dreambitc.rtc.dto.User;
+import com.dreambitc.rtc.messages.CallAnswer;
 import com.dreambitc.rtc.messages.Message;
+import com.dreambitc.rtc.messages.OnIceCandidate;
+import com.dreambitc.rtc.messages.SDPAnswer;
+import com.dreambitc.rtc.messages.SDPOffer;
 import com.dreambitc.rtc.messages.UserLogin;
 import com.dreambitc.rtc.messages.in.MakeCall;
 import com.dreambitc.rtc.messages.in.SendMessage;
@@ -22,6 +26,10 @@ import com.google.common.collect.ImmutableMap;
 import static com.dreambitc.rtc.MessageConstants.IN_OUT_MESSAGE_ID_USER_LOGIN;
 import static com.dreambitc.rtc.MessageConstants.IN_MESSAGE_ID_MAKE_CALL;
 import static com.dreambitc.rtc.MessageConstants.IN_MESSAGE_ID_SEND_MESSAGE;
+import static com.dreambitc.rtc.MessageConstants.IN_OUT_MESSAGE_ID_ANSWER_CALL;
+import static com.dreambitc.rtc.MessageConstants.IN_OUT_MESSAGE_ID_ON_ICE_CANDIDATE;
+import static com.dreambitc.rtc.MessageConstants.IN_OUT_MESSAGE_ID_SDP_OFFER;
+import static com.dreambitc.rtc.MessageConstants.IN_OUT_MESSAGE_ID_SDP_ANSWER;
 
 public class ActiveUsersServerHelper {
 
@@ -29,6 +37,10 @@ public class ActiveUsersServerHelper {
                                                               .put(IN_OUT_MESSAGE_ID_USER_LOGIN, ActiveUsersServerHelper::handleUserLoginMessage)
                                                               .put(IN_MESSAGE_ID_MAKE_CALL, ActiveUsersServerHelper::handleMakeCallMessage)
                                                               .put(IN_MESSAGE_ID_SEND_MESSAGE, ActiveUsersServerHelper::handleSendMessage)
+                                                              .put(IN_OUT_MESSAGE_ID_ANSWER_CALL, ActiveUsersServerHelper::handleCallAnswerMessage)
+                                                              .put(IN_OUT_MESSAGE_ID_ON_ICE_CANDIDATE, ActiveUsersServerHelper::handleIceCandidateMessage)
+                                                              .put(IN_OUT_MESSAGE_ID_SDP_OFFER, ActiveUsersServerHelper::handleSDPOfferMessage)
+                                                              .put(IN_OUT_MESSAGE_ID_SDP_ANSWER, ActiveUsersServerHelper::handleSDPAnswerMessage)
                                                               .build();
 
     public static MessageHandler getMessageHandler(String messageId) {
@@ -102,5 +114,41 @@ public class ActiveUsersServerHelper {
                                  .filter((Session s) -> sendMessage.getTo().equals(getUser(s)))
                                  .findFirst()
                                  .ifPresent((Session s) -> sendMessage(s, IncomingMessage.from(sendMessage)));
+    }
+
+    private static void handleCallAnswerMessage(Message message, Session session) {
+        CallAnswer callAnswer = (CallAnswer) message;
+
+        session.getOpenSessions().stream()
+                                 .filter((Session s) -> callAnswer.getCaller().equals(getUser(s)))
+                                 .findFirst()
+                                 .ifPresent((Session s) -> sendMessage(s, callAnswer));
+    }
+
+    private static void handleIceCandidateMessage(Message message, Session session) {
+        OnIceCandidate onIceCandidate = (OnIceCandidate) message;
+
+        session.getOpenSessions().stream()
+                                 .filter((Session s) -> onIceCandidate.getTo().equals(getUser(s)))
+                                 .findFirst()
+                                 .ifPresent((Session s) -> sendMessage(s, onIceCandidate));
+    }
+
+    private static void handleSDPOfferMessage(Message message, Session session) {
+        SDPOffer sdpOffer = (SDPOffer) message;
+
+        session.getOpenSessions().stream()
+                                 .filter((Session s) -> sdpOffer.getTo().equals(getUser(s)))
+                                 .findFirst()
+                                 .ifPresent((Session s) -> sendMessage(s, sdpOffer));
+    }
+    
+    private static void handleSDPAnswerMessage(Message message, Session session) {
+        SDPAnswer sdpAnswer = (SDPAnswer) message;
+
+        session.getOpenSessions().stream()
+                                 .filter((Session s) -> sdpAnswer.getTo().equals(getUser(s)))
+                                 .findFirst()
+                                 .ifPresent((Session s) -> sendMessage(s, sdpAnswer));
     }
 }

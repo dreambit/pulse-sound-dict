@@ -1,34 +1,23 @@
 package com.dreambitc.rtc.messages;
 
 import com.dreambitc.rtc.MessageConstants;
-import com.dreambitc.rtc.dto.RTCSessionDescription;
 import com.dreambitc.rtc.dto.User;
 
 public class CallAnswer extends Message {
     User caller;
-    RTCSessionDescription desc;
-    String answer;
+    boolean answer;
 
-    public CallAnswer(User caller, RTCSessionDescription desc, String answer) {
+    public CallAnswer(User caller, boolean answer) {
         super(MessageConstants.IN_OUT_MESSAGE_ID_ANSWER_CALL);
         this.caller = caller;
-        this.desc = desc;
         this.answer = answer;
-    }
-
-    public RTCSessionDescription getDesc() {
-        return desc;
-    }
-
-    public void setDesc(RTCSessionDescription desc) {
-        this.desc = desc;
     }
 
     public User getCaller() {
         return caller;
     }
 
-    public String getAnswer() {
+    public boolean getAnswer() {
         return answer;
     }
 
@@ -36,7 +25,7 @@ public class CallAnswer extends Message {
         this.caller = caller;
     }
 
-    public void setAnswer(String answer) {
+    public void setAnswer(boolean answer) {
         this.answer = answer;
     }
 

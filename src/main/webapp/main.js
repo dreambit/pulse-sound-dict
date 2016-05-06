@@ -2,6 +2,90 @@ function log(msg) {
     console.log(msg);
 } 
 
+function forceChosenAudioCodec(sdp) {
+    return maybePreferCodec(sdp, 'audio', 'send', "Opus");
+  }
+
+  // Copied from AppRTC's sdputils.js:
+
+  // Sets |codec| as the default |type| codec if it's present.
+  // The format of |codec| is 'NAME/RATE', e.g. 'opus/48000'.
+  function maybePreferCodec(sdp, type, dir, codec) {
+    var str = type + ' ' + dir + ' codec';
+    if (codec === '') {
+      trace('No preference on ' + str + '.');
+      return sdp;
+    }
+
+    trace('Prefer ' + str + ': ' + codec);
+
+    var sdpLines = sdp.split('\r\n');
+
+    // Search for m line.
+    var mLineIndex = findLine(sdpLines, 'm=', type);
+    if (mLineIndex === null) {
+      return sdp;
+    }
+
+    // If the codec is available, set it as the default in m line.
+    var codecIndex = findLine(sdpLines, 'a=rtpmap', codec);
+    console.log('codecIndex', codecIndex);
+    if (codecIndex) {
+      var payload = getCodecPayloadType(sdpLines[codecIndex]);
+      if (payload) {
+        sdpLines[mLineIndex] = setDefaultCodec(sdpLines[mLineIndex], payload);
+      }
+    }
+
+    sdp = sdpLines.join('\r\n');
+    return sdp;
+  }
+
+  // Find the line in sdpLines that starts with |prefix|, and, if specified,
+  // contains |substr| (case-insensitive search).
+  function findLine(sdpLines, prefix, substr) {
+    return findLineInRange(sdpLines, 0, -1, prefix, substr);
+  }
+
+  // Find the line in sdpLines[startLine...endLine - 1] that starts with |prefix|
+  // and, if specified, contains |substr| (case-insensitive search).
+  function findLineInRange(sdpLines, startLine, endLine, prefix, substr) {
+    var realEndLine = endLine !== -1 ? endLine : sdpLines.length;
+    for (var i = startLine; i < realEndLine; ++i) {
+      if (sdpLines[i].indexOf(prefix) === 0) {
+        if (!substr ||
+            sdpLines[i].toLowerCase().indexOf(substr.toLowerCase()) !== -1) {
+          return i;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Gets the codec payload type from an a=rtpmap:X line.
+  function getCodecPayloadType(sdpLine) {
+    var pattern = new RegExp('a=rtpmap:(\\d+) \\w+\\/\\d+');
+    var result = sdpLine.match(pattern);
+    return (result && result.length === 2) ? result[1] : null;
+  }
+
+  // Returns a new m= line with the specified codec as the first one.
+  function setDefaultCodec(mLine, payload) {
+    var elements = mLine.split(' ');
+
+    // Just copy the first three parameters; codec order starts on fourth.
+    var newLine = elements.slice(0, 3);
+
+    // Put target payload first and copy in the rest.
+    newLine.push(payload);
+    for (var i = 3; i < elements.length; i++) {
+      if (elements[i] !== payload) {
+        newLine.push(elements[i]);
+      }
+    }
+    return newLine.join(' ');
+  }
+
 $(document).ready(function() {
     $('#myModal').modal();
     $(".close").click(function() {
@@ -23,7 +107,17 @@ function main($scope) {
         $scope.peerConnection = null;
         $scope.socket = new WebSocket("wss://" + location.host + "/pulse-rtc/users");
         $scope.currentUser = {};
-        $scope.activeUser = {};
+        $scope.activeUser = null;
+        $scope.servers = null;
+        $scope.localStream =  null;
+        $scope.pcConstraints = {
+            optional: []
+        };
+        $scope.offerOptions = {
+            offerToReceiveAudio: 1,
+            offerToReceiveVideo: 0,
+            voiceActivityDetection: false
+        };
 
         $scope.send = function (object) {
             $scope.socket.send(JSON.stringify(object));
@@ -54,6 +148,13 @@ function main($scope) {
         };
 
         $scope.makeCall = function (user) {
+            $scope.activeUser = user;
+            log('Creating peer connection');
+            $scope.peerConnection = new RTCPeerConnection($scope.servers, $scope.pcConstraints); 
+            $("#callDialog").dialog({
+                closeOnEscape: false,
+                resizable: false
+            });
             $scope.send({
                 messageId : "MAKE_CALL",
                 to: user,
@@ -63,18 +164,115 @@ function main($scope) {
 
         $scope.declineCall = function () {
             $scope.send({
-                messageId : "DECLINE_CALL",
-                to: caller
+                messageId : "CALL_ANSWER",
+                caller: $scope.caller,
+                answer: false
             });
             $scope.caller = null;
+            $("#incommingCall").dialog("close");
+        };
+
+        $scope.makeCallGotDescription = function (desc) {
+            desc.sdp = forceChosenAudioCodec(desc.sdp);
+            $scope.peerConnection.setLocalDescription(desc, function() {
+                log("Sending local sdp to remote peer");
+                $scope.send({
+                    messageId : "SDP_OFFER",
+                    to: $scope.activeUser,
+                    sdp: desc
+                });
+            }, e => log("Set local description error: " + e));
+        };
+
+        $scope.answerCallGotDescription = function (desc) {
+            desc.sdp = forceChosenAudioCodec(desc.sdp);
+            $scope.peerConnection.setLocalDescription(desc, function() {
+                log("Sending local sdp to remote peer");
+                $scope.send({
+                    messageId : "SDP_ANSWER",
+                    to: $scope.caller,
+                    sdp: desc
+                });
+            }, e => log("Set local description error: " + e));
+        };
+
+
+        $scope.answerCallGotStream = function (stream) {
+            log('Received local stream');
+            log('Creating peer connection');
+            $scope.peerConnection = new RTCPeerConnection($scope.servers, $scope.pcConstraints); 
+            log("Addaching stream");
+            $scope.localStream = stream;
+            $scope.peerConnection.addStream(stream);
+            log("Addaching ice listener");
+            $scope.peerConnection.onicecandidate = $scope.answerCallICECallback;
+            log("Addaching stream listener");
+            $scope.peerConnection.onaddstream = $scope.answerCallOnAddStream;
+        };
+
+        $scope.makeCallGotStream = function (stream) {
+            log('Received local stream');
+            log("Addaching stream");
+            $scope.localStream = stream;
+            $scope.peerConnection.addStream(stream);
+            log("Addaching ice listener");
+            $scope.peerConnection.onicecandidate = $scope.makeCallICECallback;
+            log("Addaching stream listener");
+            $scope.peerConnection.onaddstream = $scope.makeCallOnAddStream;
+            log("Creating offer");
+            $scope.peerConnection.createOffer($scope.makeCallGotDescription, e => log("Creating offer error: " + e), $scope.offerOptions);
+        };
+
+        $scope.makeCallICECallback = function (event) {
+            if (event.candidate) {
+                log("Local ice candidate: " + JSON.stringify(event.candidate));
+                log("Local ice candidate: Sending to remote");
+                $scope.send({
+                    messageId : "ICE_CANDIDATE",
+                    to: $scope.activeUser,
+                    candidate: event.candidate
+                });
+            }
+        };
+ 
+        $scope.answerCallICECallback = function (event) {
+            if (event.candidate) {
+                log("Local ice candidate: " + JSON.stringify(event.candidate));
+                log("Local ice candidate: Sending to remote");
+                $scope.send({
+                    messageId : "ICE_CANDIDATE",
+                    to: $scope.caller,
+                    candidate: event.candidate
+                });
+            }
+        };
+
+        $scope.makeCallOnAddStream = function (event) {
+            attachMediaStream(document.getElementById("inCallAudio"), event.stream);
+            trace('Received remote stream');
+        };
+
+        $scope.answerCallOnAddStream = function (event) {
+            attachMediaStream(document.getElementById("inCallAudio"), event.stream);
+            trace('Received remote stream');
         };
 
         $scope.answerCall = function () {
             $scope.send({
-                messageId : "ANSWER_CALL",
-                to: caller
+                messageId : "CALL_ANSWER",
+                caller: $scope.caller,
+                answer: true
             });
             $("#incommingCall").dialog("close");
+
+            navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: false
+            })
+            .then($scope.answerCallGotStream)
+            .catch(function(e) {
+                 log('getUserMedia() error: ' + e);
+            });
         };
 
         // Message handlers
@@ -109,6 +307,18 @@ function main($scope) {
 
         $scope.handleCallAnswer = function (jsonMessageData) {
             log("handleCallAnswer: " + JSON.stringify(jsonMessageData));
+            if (jsonMessageData.answer) {
+                navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: false
+                })
+                .then($scope.makeCallGotStream)
+                .catch(function(e) {
+                     log('getUserMedia() error: ' + e);
+                });
+            } else {
+                $("#callDialog").dialog("close");
+            }
         };
 
         $scope.handleICECandidate = function (jsonMessageData) {
@@ -119,13 +329,23 @@ function main($scope) {
 
         $scope.handleIncomingCall = function (jsonMessageData) {
             log("handleIncomingCall: " + JSON.stringify(jsonMessageData));
+            $("#incommingCall").dialog({
+                closeOnEscape: false,
+                resizable: false,
+                minHeight: 0
+            });
+            $scope.caller = jsonMessageData.from;
         };
 
-        $scope.handleSDPOffer = function () {
+        $scope.handleSDPOffer = function (jsonMessageData) {
             log("handleSDPOffer: " + JSON.stringify(jsonMessageData));
+            var offer = new RTCSessionDescription(jsonMessageData.sdp);
+            $scope.peerConnection.setRemoteDescription(offer, e => log("Error setRemoteDescription:" + e));
+            $scope.peerConnection.createAnswer( $scope.answerCallGotDescription, e => log("Error creating answer:" + e));
+
         };
  
-        $scope.handleSDPAnswer = function () {
+        $scope.handleSDPAnswer = function (jsonMessageData) {
             log("handleSDPAnswer: " + JSON.stringify(jsonMessageData));
         };
 
@@ -139,7 +359,7 @@ function main($scope) {
                 case "USER_LOGOUT":
                     $scope.handleUserLogout(jsonData);
                     break;
-                case "ON_ICE_CANDIDATE":
+                case "ICE_CANDIDATE":
                     $scope.handleICECandidate(jsonData);
                     break;
                 case "USERS_LIST":

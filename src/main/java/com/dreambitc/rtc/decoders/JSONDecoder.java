@@ -9,10 +9,12 @@ import javax.websocket.EndpointConfig;
 import com.dreambitc.rtc.MessageConstants;
 import com.dreambitc.rtc.messages.CallAnswer;
 import com.dreambitc.rtc.messages.Message;
+import com.dreambitc.rtc.messages.OnIceCandidate;
+import com.dreambitc.rtc.messages.SDPAnswer;
+import com.dreambitc.rtc.messages.SDPOffer;
 import com.dreambitc.rtc.messages.UserLogin;
 import com.dreambitc.rtc.messages.in.MakeCall;
 import com.dreambitc.rtc.messages.in.SendMessage;
-import com.dreambitc.rtc.messages.out.OnIceCandidate;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 
@@ -23,7 +25,9 @@ public class JSONDecoder implements Decoder.Text<Message> {
                                                                               .put(MessageConstants.IN_MESSAGE_ID_SEND_MESSAGE, SendMessage.class)
                                                                               .put(MessageConstants.IN_MESSAGE_ID_MAKE_CALL, MakeCall.class)
                                                                               .put(MessageConstants.IN_OUT_MESSAGE_ID_ANSWER_CALL, CallAnswer.class)
-                                                                              .put(MessageConstants.OUT_MESSAGE_ID_ON_ICE_CANDIDATE, OnIceCandidate.class)
+                                                                              .put(MessageConstants.IN_OUT_MESSAGE_ID_ON_ICE_CANDIDATE, OnIceCandidate.class)
+                                                                              .put(MessageConstants.IN_OUT_MESSAGE_ID_SDP_OFFER, SDPOffer.class)
+                                                                              .put(MessageConstants.IN_OUT_MESSAGE_ID_SDP_ANSWER, SDPAnswer.class)
                                                                               .build();
 
     @Override
