@@ -149,8 +149,7 @@ function main($scope) {
 
         $scope.makeCall = function (user) {
             $scope.activeUser = user;
-            log('Creating peer connection');
-            $scope.peerConnection = new RTCPeerConnection($scope.servers, $scope.pcConstraints); 
+
             $("#callDialog").dialog({
                 closeOnEscape: false,
                 resizable: false
@@ -234,28 +233,6 @@ function main($scope) {
                 });
             }
         };
- 
-        $scope.answerCallICECallback = function (event) {
-            if (event.candidate) {
-                log("Local ice candidate: " + JSON.stringify(event.candidate));
-                log("Local ice candidate: Sending to remote");
-                $scope.send({
-                    messageId : "ICE_CANDIDATE",
-                    to: $scope.caller,
-                    candidate: event.candidate
-                });
-            }
-        };
-
-        $scope.makeCallOnAddStream = function (event) {
-            attachMediaStream(document.getElementById("inCallAudio"), event.stream);
-            trace('Received remote stream');
-        };
-
-        $scope.answerCallOnAddStream = function (event) {
-            attachMediaStream(document.getElementById("inCallAudio"), event.stream);
-            trace('Received remote stream');
-        };
 
         $scope.answerCall = function () {
             $scope.send({
@@ -265,14 +242,27 @@ function main($scope) {
             });
             $("#incommingCall").dialog("close");
 
-            navigator.mediaDevices.getUserMedia({
-                audio: true,
-                video: false
-            })
-            .then($scope.answerCallGotStream)
-            .catch(function(e) {
-                 log('getUserMedia() error: ' + e);
-            });
+            log('Creating peer connection');
+            $scope.peerConnection = new RTCPeerConnection($scope.servers, $scope.pcConstraints);
+
+            log("Addaching ice listener");
+            $scope.peerConnection.onicecandidate = function (event) {
+                if (event.candidate) {
+                    log("Local ice candidate: " + JSON.stringify(event.candidate));
+                    log("Local ice candidate: Sending to remote");
+                    $scope.send({
+                        messageId : "ICE_CANDIDATE",
+                        to: $scope.caller,
+                        candidate: event.candidate
+                    });
+                }
+            };
+
+            log("Addaching stream listener");
+            $scope.peerConnection.onaddstream = function (event) {
+                attachMediaStream(document.getElementById("inCallAudio"), event.stream);
+                trace('Received remote stream');
+            };
         };
 
         // Message handlers
@@ -308,14 +298,29 @@ function main($scope) {
         $scope.handleCallAnswer = function (jsonMessageData) {
             log("handleCallAnswer: " + JSON.stringify(jsonMessageData));
             if (jsonMessageData.answer) {
-                navigator.mediaDevices.getUserMedia({
-                    audio: true,
-                    video: false
-                })
-                .then($scope.makeCallGotStream)
-                .catch(function(e) {
-                     log('getUserMedia() error: ' + e);
-                });
+                log('Creating peer connection');
+                $scope.peerConnection = new RTCPeerConnection($scope.servers, $scope.pcConstraints); 
+                log("Addaching ice listener");
+                $scope.peerConnection.onicecandidate = function (event) {
+                    if (event.candidate) {
+                        log("Local ice candidate: " + JSON.stringify(event.candidate));
+                        log("Local ice candidate: Sending to remote");
+                        $scope.send({
+                            messageId : "ICE_CANDIDATE",
+                            to: $scope.activeUser,
+                            candidate: event.candidate
+                        });
+                    }
+                };
+
+                log("Addaching stream listener");
+                $scope.peerConnection.onaddstream = function (event) {
+                    attachMediaStream(document.getElementById("inCallAudio"), event.stream);
+                    trace('Received remote stream');
+                };
+
+                log("Creating offer");
+                $scope.peerConnection.createOffer($scope.makeCallGotDescription, e => log("Creating offer error: " + e), $scope.offerOptions);
             } else {
                 $("#callDialog").dialog("close");
             }
@@ -343,10 +348,14 @@ function main($scope) {
             $scope.peerConnection.setRemoteDescription(offer, e => log("Error setRemoteDescription:" + e));
             $scope.peerConnection.createAnswer( $scope.answerCallGotDescription, e => log("Error creating answer:" + e));
 
+            
+
         };
  
         $scope.handleSDPAnswer = function (jsonMessageData) {
             log("handleSDPAnswer: " + JSON.stringify(jsonMessageData));
+            var answer = new RTCSessionDescription(jsonMessageData.sdp);
+            $scope.peerConnection.setRemoteDescription(answer, e => log("Error setRemoteDescription:" + e));
         };
 
         $scope.socket.onmessage = function(message) {
