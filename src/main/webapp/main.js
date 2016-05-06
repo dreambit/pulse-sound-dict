@@ -259,10 +259,6 @@ function main($scope) {
         $scope.handleCallAnswer = function (jsonMessageData) {
             log("handleCallAnswer: " + JSON.stringify(jsonMessageData));
             if (jsonMessageData.answer) {
-                
-                
-                
-                
                 navigator.mediaDevices.getUserMedia({
                     audio: true,
                     video: false
