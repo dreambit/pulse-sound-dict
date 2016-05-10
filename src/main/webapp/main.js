@@ -113,6 +113,8 @@ function main($scope) {
         $scope.pcConstraints = {
             optional: []
         };
+        $scope.sdpExchanged = false;
+        $scope.iceQueue = [];
         $scope.offerOptions = {
             offerToReceiveAudio: 1,
             offerToReceiveVideo: 0,
@@ -169,30 +171,6 @@ function main($scope) {
             });
             $scope.caller = null;
             $("#incommingCall").dialog("close");
-        };
-
-        $scope.makeCallGotDescription = function (desc) {
-            desc.sdp = forceChosenAudioCodec(desc.sdp);
-            $scope.peerConnection.setLocalDescription(desc, function() {
-                log("Sending local sdp to remote peer");
-                $scope.send({
-                    messageId : "SDP_OFFER",
-                    to: $scope.activeUser,
-                    sdp: desc
-                });
-            }, e => log("Set local description error: " + e));
-        };
-
-        $scope.answerCallGotDescription = function (desc) {
-            desc.sdp = forceChosenAudioCodec(desc.sdp);
-            $scope.peerConnection.setLocalDescription(desc, function() {
-                log("Sending local sdp to remote peer");
-                $scope.send({
-                    messageId : "SDP_ANSWER",
-                    to: $scope.caller,
-                    sdp: desc
-                });
-            }, e => log("Set local description error: " + e));
         };
 
         $scope.answerCall = function () {
@@ -257,15 +235,22 @@ function main($scope) {
         };
 
         $scope.handleCallAnswer = function (jsonMessageData) {
-            log("handleCallAnswer: " + JSON.stringify(jsonMessageData));
-            if (jsonMessageData.answer) {
-                navigator.mediaDevices.getUserMedia({
-                    audio: true,
-                    video: false
-                })
-                .then(stream => {
+
+            var gotDescription = function (desc) {
+                    desc.sdp = forceChosenAudioCodec(desc.sdp);
+                    $scope.peerConnection.setLocalDescription(desc, function() {
+                        log("Sending local sdp to remote peer");
+                        $scope.send({
+                            messageId : "SDP_OFFER",
+                            to: $scope.activeUser,
+                            sdp: desc
+                        });
+                    }, e => log("Set local description error: " + e));
+                },
+                gotStream = function (stream) {
                     log('Creating peer connection');
-                    $scope.peerConnection = new RTCPeerConnection($scope.servers, $scope.pcConstraints); 
+                    $scope.peerConnection = new RTCPeerConnection($scope.servers, $scope.pcConstraints);
+                    $scope.localStream = stream;
                     log("Addaching ice listener");
                     $scope.peerConnection.onicecandidate = function (event) {
                         if (event.candidate) {
@@ -288,8 +273,17 @@ function main($scope) {
                     $scope.peerConnection.addStream(stream);
 
                     log("Creating offer");
-                    $scope.peerConnection.createOffer($scope.makeCallGotDescription, e => log("Creating offer error: " + e), $scope.offerOptions);
-                });
+                    $scope.peerConnection.createOffer(gotDescription, e => log("Creating offer error: " + e), $scope.offerOptions);
+                };
+            
+
+            log("handleCallAnswer: " + JSON.stringify(jsonMessageData));
+            if (jsonMessageData.answer) {
+                navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: false
+                })
+                .then(gotStream);
             } else {
                 $("#callDialog").dialog("close");
             }
@@ -311,7 +305,27 @@ function main($scope) {
             $scope.caller = jsonMessageData.from;
         };
 
+        $scope.sdpExchangeComplete = function () {
+            $scope.iceQueue.forEach(function (elm) {
+                $scope.handleICECandidate(elm);
+            });
+        };
+
         $scope.handleSDPOffer = function (jsonMessageData) {
+            var gotDescription = function (desc) {
+                $scope.sdpExchangeComplete();
+                desc.sdp = forceChosenAudioCodec(desc.sdp);
+                $scope.peerConnection.setLocalDescription(desc, function() {
+                    log("Sending local sdp to remote peer");
+                    $scope.send({
+                        messageId : "SDP_ANSWER",
+                        to: $scope.caller,
+                        sdp: desc
+                    });
+                }, e => log("Set local description error: " + e));
+            };
+            
+            
             log("handleSDPOffer: " + JSON.stringify(jsonMessageData));
             navigator.mediaDevices.getUserMedia({
                 audio: true,
@@ -320,24 +334,25 @@ function main($scope) {
             .then(stream => {
                 log("Stream added: " + stream);
                 $scope.peerConnection.addStream(stream);
+                $scope.peerConnection.setRemoteDescription(new RTCSessionDescription(jsonMessageData.sdp)).then(function () {
+                    log("setRemoteDescription: nice: handleSDPOffer");
+                })
+                .catch(function (e) {
+                    log("setRemoteDescription: bad: handleSDPOffer: " + e);
+                });
+                $scope.peerConnection.createAnswer(gotDescription, e => log("Error creating answer:" + e));
             });
-            $scope.peerConnection.setRemoteDescription(new RTCSessionDescription(jsonMessageData.sdp)).then(function () {
-                log("setRemoteDescription: nice");
-            })
-            .catch(function (e) {
-                log("setRemoteDescription: bad: " + e);
-            });
-            $scope.peerConnection.createAnswer($scope.answerCallGotDescription, e => log("Error creating answer:" + e));
         };
  
         $scope.handleSDPAnswer = function (jsonMessageData) {
             log("handleSDPAnswer: " + JSON.stringify(jsonMessageData));
             $scope.peerConnection.setRemoteDescription(new RTCSessionDescription(jsonMessageData.sdp))
             .then(function () {
-                log("setRemoteDescription: nice");
+                log("setRemoteDescription: nice: handleSDPAnswer");
+                $scope.sdpExchangeComplete();
             })
             .catch(function (e) {
-                log("setRemoteDescription: bad: " + e);
+                log("setRemoteDescription: bad: handleSDPAnswer: " + e);
             });
         };
 
@@ -352,7 +367,7 @@ function main($scope) {
                     $scope.handleUserLogout(jsonData);
                     break;
                 case "ICE_CANDIDATE":
-                    $scope.handleICECandidate(jsonData);
+                    $scope.iceQueue.push(jsonData);
                     break;
                 case "USERS_LIST":
                     $scope.handleUsersList(jsonData);
