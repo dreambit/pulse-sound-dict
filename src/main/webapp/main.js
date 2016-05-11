@@ -106,6 +106,11 @@ function main($scope) {
         $scope.caller = null;
 
         /**
+         * 
+         */
+        $scope.callStatus = "";
+
+        /**
          * Connection
          */
         $scope.peerConnection = null;
@@ -215,6 +220,7 @@ function main($scope) {
                 to: user,
                 from: $scope.currentUser
             });
+            $scope.callStatus = "Waiting for answer...";
         };
 
         $scope.declineCall = function () {
@@ -309,6 +315,9 @@ function main($scope) {
                     }, e => log("Set local description error: " + e));
                 },
                 gotStream = function (stream) {
+                    $scope.$apply(function () {
+                        $scope.callStatus = "Connecting to peer...";
+                    });
                     log('Creating peer connection');
                     $scope.peerConnection = new RTCPeerConnection($scope.servers, $scope.pcConstraints);
                     $scope.localStream = stream;
@@ -377,6 +386,9 @@ function main($scope) {
             $scope.iceQueue.forEach(function (elm) {
                 $scope.handleICECandidate(elm);
             });
+            $scope.$apply(function () {
+                $scope.callStatus = "Connected";
+            });
         };
 
         $scope.handleSDPOffer = function (jsonMessageData) {
@@ -421,7 +433,8 @@ function main($scope) {
                 $scope.sdpExchangeComplete();
             })
             .catch(function (e) {
-                log("setRemoteDescription: bad: handleSDPAnswer: " + e);
+                alert("Unable to set remote description. Ending call...");
+                $scope.endCallOnError();
             });
         };
 
